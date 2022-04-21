@@ -7,12 +7,12 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 /*
 KingOfDefi V0 game
 Rules:
-1) Users can partecipate to the weekly defiWar
-2) Every user will have the same amount of VUSD to trade
-3) VUSD can be swapped for any v-asset supported by chainlink feeders oracles
-4) The first on the leaderboard can stole the crown.
-4) At the end of the week the crown holders can redeem the prize 
-Every week will be a prize to win
+1) Users can subscribe to the game for free, it gives 100K virtual-USD to the player.
+2) Players can use the v-USD to buy other virtual assets, the pair rate price is fetched via the related chainlink oracle.
+3) Players can swap virtual asset for the entire game period, there is only a delay to wait between swaps by the same player.
+4) At the end of the game period, a new crown dispute period begins and players can start to steal the crown from other players.
+5) The crown can be steal ONLY IF the actual USD value of the total virtual assets bought is higher than the actual crown holder usd value.
+6) At the end of the dispute period, the king can redeem the prize.
 */
 
 interface ICLH {
@@ -28,11 +28,13 @@ contract KingOfDefiV0 {
     mapping(address => mapping(uint256 => uint256)) public balances; // user => asset index => amount
     mapping(address => bool) public subscribed;
     mapping(address => uint256) public prizes;
-    mapping(address => uint256) public lastAction;
+    mapping(address => uint256) public lastSwap;
 
     uint256 gameEnd = block.timestamp + 7 days;
     uint256 disputeTime = 1 days;
-    uint256 actionDelay = 5 minutes;
+    uint256 swapDelay = 5 minutes;
+
+    uint256 numberOfPlayers;
 
     address king;
     address chainlinkHub;
@@ -51,8 +53,10 @@ contract KingOfDefiV0 {
     /// @dev it will give to the player 100K virtual-USD (VUSD)
     function play() external {
         require(!subscribed[msg.sender], "already subscribed");
+        require(block.timestamp < gameEnd, "subscripton closed");
         subscribed[msg.sender] = true;
         balances[msg.sender][0] = 100_000 * 10**18; // 0 is VUSD
+        numberOfPlayers++;
         emit Subscribed(msg.sender);
     }
 
@@ -62,31 +66,29 @@ contract KingOfDefiV0 {
     /// @param _toIndex index of tthe token to swap to
     /// @param _amount amount to swap from
     function swap(uint256 _fromIndex, uint256 _toIndex, uint256 _amount) external {
-        require(block.timestamp > lastAction[msg.sender] + actionDelay, "action delay not elapsed");
+        require(block.timestamp > lastSwap[msg.sender] + swapDelay, "swap delay not elapsed");
         require(_fromIndex != _toIndex, "same index");
         require(_amount > 0, "set an amount > 0");
         require(balances[msg.sender][_fromIndex] >= _amount, "amount not enough");
 
+        // v-usd <-> v-asset swap
         uint256 fromUSD;
+        uint256 toUSD = ICLH(chainlinkHub).getLastUSDPrice(_toIndex);
         if(_fromIndex == 0) {
             fromUSD = _amount; // v-usd
         } else {
             fromUSD = ICLH(chainlinkHub).getUSDForAmount(_fromIndex, _amount);
-        }
-        
-        uint256 toUSD;
-        if(_toIndex == 0) {
-            toUSD = 10**18; // v-usd
-        } else {
-            toUSD = ICLH(chainlinkHub).getLastUSDPrice(_toIndex) * 10**10;
+            if (_toIndex == 0) {
+                toUSD = 1e18; // v-usd
+            }
         }
 
-        uint256 amountToBuy = fromUSD * 10**18 / toUSD;
+        uint256 amountToBuy = fromUSD * 1e18 / toUSD;
 
         unchecked{balances[msg.sender][_fromIndex] -= _amount;}
         balances[msg.sender][_toIndex] += amountToBuy;
 
-        lastAction[msg.sender] = block.timestamp;
+        lastSwap[msg.sender] = block.timestamp;
 
         emit Swapped(_fromIndex, _amount, _toIndex, amountToBuy);
     }
@@ -96,9 +98,9 @@ contract KingOfDefiV0 {
 	/// @param _token token to redeem
     /// @param _amount amount to redeem
     function redeemPrize(address _token, uint256 _amount) external {
-        require(block.timestamp > gameEnd + disputeTime, "Can't redeem yet");
-        require(msg.sender == king, "Only the king");
-        require(prizes[_token] >= _amount, "Amount too high");
+        require(block.timestamp > gameEnd + disputeTime, "can't redeem yet");
+        require(msg.sender == king, "only the king");
+        require(prizes[_token] >= _amount, "amount too high");
         IERC20(_token).safeTransfer(msg.sender, _amount);
         unchecked{prizes[_token] -= _amount;} // skip underflow check
     }

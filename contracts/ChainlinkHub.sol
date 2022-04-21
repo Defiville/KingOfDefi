@@ -17,7 +17,7 @@ pragma solidity 0.8.13;
 // 13 - doge/usd 0xbaf9327b6564454F4a3364C33eFeEf032b4b4444
 // 14 - dot/usd 0xacb51F1a83922632ca02B25a8164c10748001BdE
 // 15 - eth/usd 0xF9680D99D6C9589e2a93a78A04A279e509205945
-// 16- ftm/usd 0x58326c0F831b2Dbf7234A4204F28Bba79AA06d5f
+// 16 - ftm/usd 0x58326c0F831b2Dbf7234A4204F28Bba79AA06d5f
 // 17 - fxs/usd 0x6C0fe985D3cAcbCdE428b84fc9431792694d0f51
 // 18 - ghst/usd 0xDD229Ce42f11D8Ee7fFf29bDB71C7b81352e11be
 // 19 - link/usd 0xd9FFdb71EbE7496cC440152d43986Aae0AB76665
@@ -42,6 +42,8 @@ contract ChainlinkHub {
         governance = msg.sender;
     }
 
+    /// @notice add new oracles to the hub
+	/// @param _oracles oracle addresses
     function addOracles(address[] memory _oracles) external {
         require(msg.sender == governance, "!gov");
         for (uint256 i = 0; i < _oracles.length; i++) {
@@ -49,11 +51,15 @@ contract ChainlinkHub {
         }
     }
 
+    /// @notice add new oracle to the hub
+	/// @param _oracle oracle address
     function addOracle(address _oracle) external {
         require(msg.sender == governance, "!gov");
         _addOracle(_oracle);
     }
 
+    /// @notice internal function to add a new oracle to the hub
+	/// @param _oracle oracle address
     function _addOracle(address _oracle) internal {
         require(_oracle != address(0));
         oracles[oracleLastIndex] = _oracle;
@@ -61,22 +67,31 @@ contract ChainlinkHub {
         emit OracleAdded(_oracle);
     }
 
+    /// @notice get the last USD price for the asset
+	/// @param _assetIndex index of the asset
     function getLastUSDPrice(uint256 _assetIndex) external view returns(uint256) {
         address oracle = oracles[_assetIndex];
-        return IOracle(oracle).latestAnswer();
+        return IOracle(oracle).latestAnswer() * 1e10;
     }
 
+    /// @notice add new oracle to the hub
+	/// @param _assetIndex oracle address
+    /// @param _amount asset amount
     function getUSDForAmount(uint256 _assetIndex, uint256 _amount) external view returns(uint256) {
         address oracle = oracles[_assetIndex];
         uint256 usdValue = IOracle(oracle).latestAnswer();
-        return usdValue * _amount / 10**8;
+        return usdValue * _amount / 1e8;
     }
 
+    /// @notice get the asset description
+	/// @param _assetIndex oracle address
     function assetDescription(uint256 _assetIndex) external view returns(string memory) {
         address oracle = oracles[_assetIndex];
         return IOracle(oracle).description();
     }
 
+    /// @notice set the governance
+	/// @param _governance governance address
     function setGovernance(address _governance) external {
         require(msg.sender == governance, "!gov");
         emit GovernanceChanged(governance, _governance);

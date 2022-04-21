@@ -86,7 +86,7 @@ describe("KingOfDefiV0", function () {
 
         it("should swap v-usd", async () => {
             await kod.connect(player1).swap(0, 1, parseEther("100"));
-            await expect(kod.connect(player1).swap(0, 1, parseEther("100"))).to.be.revertedWith("action delay not elapsed");
+            await expect(kod.connect(player1).swap(0, 1, parseEther("100"))).to.be.revertedWith("swap delay not elapsed");
             const v1INCHBalance = await kod["balances(address,uint256)"](player1.address, 1);
             console.log(v1INCHBalance.toString());
 
@@ -115,7 +115,7 @@ describe("KingOfDefiV0", function () {
 
         it("the winner should claim the reward", async () => {
             const amountToRedeem = parseEther("10");
-            await expect(kod.connect(player2).redeemPrize(sdt.address, amountToRedeem)).to.be.revertedWith("Can't redeem yet");
+            await expect(kod.connect(player2).redeemPrize(sdt.address, amountToRedeem)).to.be.revertedWith("can't redeem yet");
             await network.provider.send("evm_increaseTime", [60 * 60 * 24 * 1]);
             await network.provider.send("evm_mine", []);
             const sdtBefore = await sdt.balanceOf(player2.address)

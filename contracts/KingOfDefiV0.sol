@@ -52,31 +52,31 @@ contract KingOfDefiV0 {
     /// @notice subscribe to the game, one subscription for each address
     /// @dev it will give to the player 100K virtual-USD (VUSD)
     function play() external {
+        require(block.timestamp < gameEnd, "subscriptions closed");
         require(!subscribed[msg.sender], "already subscribed");
-        require(block.timestamp < gameEnd, "subscripton closed");
         subscribed[msg.sender] = true;
         balances[msg.sender][0] = 100_000 * 10**18; // 0 is VUSD
         numberOfPlayers++;
         emit Subscribed(msg.sender);
     }
 
-    /// @notice swap virtual asset to another virtual asset
+    /// @notice swap virtual asset to another virtual asset (only during the game period)
     /// @dev the asset price will be fetched via chainlink oracles
 	/// @param _fromIndex index of the token to swap from
-    /// @param _toIndex index of tthe token to swap to
-    /// @param _amount amount to swap from
+    /// @param _toIndex index of the token to swap to
+    /// @param _amount amount to swap
     function swap(uint256 _fromIndex, uint256 _toIndex, uint256 _amount) external {
-        require(block.timestamp > lastSwap[msg.sender] + swapDelay, "swap delay not elapsed");
+        require(block.timestamp < gameEnd, "game is over");
+        require(block.timestamp > lastSwap[msg.sender] + swapDelay, "player swap delay not elapsed");
         require(_fromIndex != _toIndex, "same index");
         require(_amount > 0, "set an amount > 0");
         require(balances[msg.sender][_fromIndex] >= _amount, "amount not enough");
 
         // v-usd <-> v-asset swap
-        uint256 fromUSD;
+        uint256 fromUSD = _amount;
         uint256 toUSD = ICLH(chainlinkHub).getLastUSDPrice(_toIndex);
-        if(_fromIndex == 0) {
-            fromUSD = _amount; // v-usd
-        } else {
+
+        if(_fromIndex != 0) {
             fromUSD = ICLH(chainlinkHub).getUSDForAmount(_fromIndex, _amount);
             if (_toIndex == 0) {
                 toUSD = 1e18; // v-usd

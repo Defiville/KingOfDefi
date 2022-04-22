@@ -42,10 +42,11 @@ describe("KingOfDefiV0", function () {
     let player1: SignerWithAddress;
     let player2: SignerWithAddress;
     let player3: SignerWithAddress;
+    let player4: SignerWithAddress;
     let sdtWhale: JsonRpcSigner;
 
     before(async function () {
-        [deployer, player1, player2, player3] = await ethers.getSigners();
+        [deployer, player1, player2, player3, player4] = await ethers.getSigners();
         const CLH = await ethers.getContractFactory("ChainlinkHub");
         const KOD = await ethers.getContractFactory("KingOfDefiV0");
         sdt = await ethers.getContractAt(SDTABI, SDT)
@@ -61,7 +62,17 @@ describe("KingOfDefiV0", function () {
 
         // add some oracles
         await clh.addOracle("0x443C5116CdF663Eb387e72C688D276e702135C87"); // 1 inch
-        await clh.addOracles(["0x72484B12719E23115761D5DA1646945632979bB6", "0x882554df528115a743c4537828DA8D5B58e52544"]);
+        await clh.addOracles([
+            "0x72484B12719E23115761D5DA1646945632979bB6", 
+            "0x882554df528115a743c4537828DA8D5B58e52544",
+            "0x5DB6e61B6159B20F068dc15A47dF2E5931b14f29",
+            "0x03Bc6D9EFed65708D35fDaEfb25E87631a0a3437",
+            "0xF626964Ba5e81405f47e8004F0b276Bb974742B5",
+            "0xD106B538F2A868c28Ca1Ec7E298C3325E0251d66",
+            "0x82a6c4AF830caa6c97bb504425f6A66165C2c26e",
+            "0xc907E116054Ad103354f2D350FD2514433D57F6f",
+            "0x2A8758b7257102461BC958279054e372C2b1bDE6"
+        ]);
 
         await network.provider.send("hardhat_setBalance", [sdtWhale._address, parseEther("10").toHexString()]);
 
@@ -69,6 +80,15 @@ describe("KingOfDefiV0", function () {
         const amountToSend = parseEther("10");
         await sdt.connect(sdtWhale).approve(kod.address, amountToSend);
         await kod.connect(sdtWhale).topUpPrize(sdt.address, amountToSend);
+    });
+
+    describe("ChainlinkHub", function() {
+        it("should fetch the oracle description", async () => {
+            const asset1Inch = await clh.assetDescription(1);
+            const assetAave = await clh.assetDescription(2);
+            expect(asset1Inch).eq("1INCH / USD");
+            expect(assetAave).eq("AAVE / USD");
+        });
     });
 
     describe("Play the game", function() {
@@ -88,7 +108,6 @@ describe("KingOfDefiV0", function () {
             await kod.connect(player1).swap(0, 1, parseEther("100"));
             await expect(kod.connect(player1).swap(0, 1, parseEther("100"))).to.be.revertedWith("swap delay not elapsed");
             const v1INCHBalance = await kod["balances(address,uint256)"](player1.address, 1);
-            console.log(v1INCHBalance.toString());
 
             await network.provider.send("evm_increaseTime", [60 * 5]);
             await network.provider.send("evm_mine", []);
@@ -98,17 +117,16 @@ describe("KingOfDefiV0", function () {
             expect(vUSDBalance).eq(parseEther("99800"));
             
             const v2INCHBalance = await kod["balances(address,uint256)"](player1.address, 1);
-            console.log(v2INCHBalance.toString());
         });
 
         it("should steal the crown", async () => {
             await expect(kod.connect(player1).stealCrown()).to.be.revertedWith("only during dispute time");
             await network.provider.send("evm_increaseTime", [60 * 60 * 24 * 7]);
             await network.provider.send("evm_mine", []);
+            // try to subscribe
+            await expect(kod.connect(player4).play()).to.be.revertedWith("subscriptions closed");
             const usdPlayer1 = await kod.calculateTotalUSD(player1.address);
-            console.log(usdPlayer1.toString());
             const usdPlayer2 = await kod.calculateTotalUSD(player2.address);
-            console.log(usdPlayer2.toString());
             await kod.connect(player1).stealCrown();
             await kod.connect(player2).stealCrown();
         });

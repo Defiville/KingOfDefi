@@ -71,7 +71,7 @@ contract ChainlinkHub {
 	/// @param _assetIndex index of the asset
     function getLastUSDPrice(uint256 _assetIndex) external view returns(uint256) {
         address oracle = oracles[_assetIndex];
-        return IOracle(oracle).latestAnswer() * 1e10;
+        return IOracle(oracle).latestAnswer() * (1e18 / 10**IOracle(oracle).decimals());
     }
 
     /// @notice add new oracle to the hub
@@ -80,7 +80,7 @@ contract ChainlinkHub {
     function getUSDForAmount(uint256 _assetIndex, uint256 _amount) external view returns(uint256) {
         address oracle = oracles[_assetIndex];
         uint256 usdValue = IOracle(oracle).latestAnswer();
-        return usdValue * _amount / 1e8;
+        return usdValue * _amount / 10**IOracle(oracle).decimals();
     }
 
     /// @notice get the asset description

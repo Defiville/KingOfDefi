@@ -49,9 +49,12 @@ describe("KingOfDefiV0", function () {
         [deployer, player1, player2, player3, player4] = await ethers.getSigners();
         const CLH = await ethers.getContractFactory("ChainlinkHub");
         const KOD = await ethers.getContractFactory("KingOfDefiV0");
-        sdt = await ethers.getContractAt(SDTABI, SDT)
+        const gameDuration =  60 * 60 * 24 * 7; // 7 days
+        const disputeDuration = 60 * 60 * 24; // 1 day
+        const swapDelay = 60 * 5; // 5 minutes
+        sdt = await ethers.getContractAt(SDTABI, SDT);
         clh = await CLH.deploy();
-        kod = await KOD.deploy(clh.address);
+        kod = await KOD.deploy(gameDuration, disputeDuration, swapDelay, clh.address);
 
         await network.provider.request({
             method: "hardhat_impersonateAccount",

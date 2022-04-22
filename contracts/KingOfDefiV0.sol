@@ -30,9 +30,9 @@ contract KingOfDefiV0 {
     mapping(address => uint256) public prizes;
     mapping(address => uint256) public lastSwap;
 
-    uint256 gameEnd = block.timestamp + 7 days;
-    uint256 disputeTime = 1 days;
-    uint256 swapDelay = 5 minutes;
+    uint256 gameEnd;
+    uint256 disputeDuration;
+    uint256 swapDelay;
 
     uint256 numberOfPlayers;
 
@@ -45,7 +45,15 @@ contract KingOfDefiV0 {
     event NewKing(address oldKing, uint256 oldKingUSD, address newKing, uint256 newKingUSD);
     event RewardAdded(address token, uint256 amount);
 
-    constructor(address _chainlinkHub) {
+    constructor(
+        uint256 _gameDuration, 
+        uint256 _disputeDuration, 
+        uint256 _swapDelay, 
+        address _chainlinkHub
+    ) {
+        gameEnd = block.timestamp + _gameDuration;
+        disputeDuration = _disputeDuration;
+        swapDelay = _swapDelay;
         chainlinkHub = _chainlinkHub;
     }
     
@@ -98,7 +106,7 @@ contract KingOfDefiV0 {
 	/// @param _token token to redeem
     /// @param _amount amount to redeem
     function redeemPrize(address _token, uint256 _amount) external {
-        require(block.timestamp > gameEnd + disputeTime, "can't redeem yet");
+        require(block.timestamp > gameEnd + disputeDuration, "can't redeem yet");
         require(msg.sender == king, "only the king");
         require(prizes[_token] >= _amount, "amount too high");
         IERC20(_token).safeTransfer(msg.sender, _amount);
@@ -108,7 +116,7 @@ contract KingOfDefiV0 {
     /// @notice steal the crown from the king, you can if you have more usd value
     /// @dev it can be called only during the crown dispute time
     function stealCrown() external {
-        require(block.timestamp > gameEnd && block.timestamp < gameEnd + disputeTime, "only during dispute time");
+        require(block.timestamp > gameEnd && block.timestamp < gameEnd + disputeDuration, "only during dispute time");
         if (king == address(0)) {
             king = msg.sender;
             return;

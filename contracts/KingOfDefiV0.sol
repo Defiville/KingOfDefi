@@ -18,7 +18,8 @@ Rules:
 interface ICLH {
     function getLastUSDPrice(uint256) external view returns(uint256);
     function getUSDForAmount(uint256, uint256) external view returns(uint256);
-    function oracleLastIndex() external view returns(uint256);
+    function oracleNextIndex() external view returns(uint256);
+    function assetDescription(uint256) external view returns(string memory);
 }
 
 contract KingOfDefiV0 {
@@ -76,26 +77,38 @@ contract KingOfDefiV0 {
     function swap(uint256 _fromIndex, uint256 _toIndex, uint256 _amount) external {
         require(block.timestamp < gameEnd, "game is over");
         require(block.timestamp > lastSwap[msg.sender] + swapDelay, "player swap delay not elapsed");
+
+        uint256 lastIndex = ICLH(chainlinkHub).oracleNextIndex();
         require(_fromIndex != _toIndex, "same index");
+        require(_fromIndex < lastIndex && _toIndex < lastIndex, "only existing indexes");
+
         require(_amount > 0, "set an amount > 0");
         require(balances[msg.sender][_fromIndex] >= _amount, "amount not enough");
 
-        // v-usd <-> v-asset swap
-        uint256 fromUSD = _amount;
-        uint256 toUSD = ICLH(chainlinkHub).getLastUSDPrice(_toIndex);
-
-        if(_fromIndex != 0) {
+        uint256 fromUSD;
+        uint256 toUSD;
+        if (_toIndex == 0) {
+            // v-asset <-> v-usd
             fromUSD = ICLH(chainlinkHub).getUSDForAmount(_fromIndex, _amount);
-            if (_toIndex == 0) {
-                toUSD = 1e18; // v-usd
-            }
+            toUSD = 1e18;
+        } else {
+            toUSD = ICLH(chainlinkHub).getLastUSDPrice(_toIndex);
+            if(_fromIndex == 0) {
+                // v-usd <-> v-asset
+                fromUSD = _amount;
+            } else {
+                // v-asset <-> v-asset
+                fromUSD = ICLH(chainlinkHub).getUSDForAmount(_fromIndex, _amount);
+            }  
         }
 
         uint256 amountToBuy = fromUSD * 1e18 / toUSD;
 
+        // swap
         unchecked{balances[msg.sender][_fromIndex] -= _amount;}
         balances[msg.sender][_toIndex] += amountToBuy;
 
+        // store the actual ts to manage the swap delay
         lastSwap[msg.sender] = block.timestamp;
 
         emit Swapped(_fromIndex, _amount, _toIndex, amountToBuy);
@@ -110,7 +123,7 @@ contract KingOfDefiV0 {
         require(msg.sender == king, "only the king");
         require(prizes[_token] >= _amount, "amount too high");
         IERC20(_token).safeTransfer(msg.sender, _amount);
-        unchecked{prizes[_token] -= _amount;} // skip underflow check
+        unchecked{prizes[_token] -= _amount;}
     }
 
     /// @notice steal the crown from the king, you can if you have more usd value
@@ -129,6 +142,17 @@ contract KingOfDefiV0 {
         }
     }
 
+    /// @notice top up weekly prize with any ERC20 (until the game end)
+    /// @dev approve the token before calling the function
+	/// @param _token token to top up
+    /// @param _amount amount to top up
+    function topUpPrize(address _token, uint256 _amount) external {
+        require(block.timestamp <= gameEnd, "match already ended");
+        IERC20(_token).transferFrom(msg.sender, address(this), _amount);
+        prizes[_token] += _amount;
+        emit RewardAdded(_token, _amount);
+    }
+
     /// @notice calculate usd value of an asset
     /// @dev approve the token before calling the function
 	/// @param _player player address
@@ -142,26 +166,23 @@ contract KingOfDefiV0 {
 	/// @param _player player address
     function calculateTotalUSD(address _player) public view returns(uint256) {
         uint256 usdTotalAmount;
-        uint256 lastIndex = ICLH(chainlinkHub).oracleLastIndex();
+        uint256 nextIndex = ICLH(chainlinkHub).oracleNextIndex();
         usdTotalAmount += balances[_player][0]; // v-usd
-        for(uint256 index = 1; index < lastIndex; index++) {
+        for(uint256 index = 1; index < nextIndex; index++) {
             uint256 amount = balances[_player][index];
             if (amount > 0) {
                 usdTotalAmount += ICLH(chainlinkHub).getUSDForAmount(index, amount);
-            }
-            
+            }  
         }
         return usdTotalAmount;
     }
 
-    /// @notice top up weekly prize with any ERC20 (until the game end)
-    /// @dev approve the token before calling the function
-	/// @param _token token to top up
-    /// @param _amount amount to top up
-    function topUpPrize(address _token, uint256 _amount) external {
-        require(block.timestamp <= gameEnd, "match already ended");
-        IERC20(_token).transferFrom(msg.sender, address(this), _amount);
-        prizes[_token] += _amount;
-        emit RewardAdded(_token, _amount);
+    /// @notice it returns the description of the asset (ETH / USD)
+	/// @param _index index of the asset
+    function getAssetFromIndex(uint256 _index) external view returns(string memory) {
+        if (_index == 0) {
+            return "VUSD";
+        }
+        return ICLH(chainlinkHub).assetDescription(_index);
     }
 }

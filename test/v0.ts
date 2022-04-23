@@ -107,7 +107,7 @@ describe("KingOfDefiV0", function () {
             expect(vusdPlayer3).eq(parseEther("100000"))
         });
 
-        it("should swap v-usd", async () => {
+        it("should swap v-usd <-> v-asset", async () => {
             await kod.connect(player1).swap(0, 1, parseEther("100"));
             await expect(kod.connect(player1).swap(0, 1, parseEther("100"))).to.be.revertedWith("swap delay not elapsed");
             const v1INCHBalance = await kod["balances(address,uint256)"](player1.address, 1);
@@ -120,6 +120,34 @@ describe("KingOfDefiV0", function () {
             expect(vUSDBalance).eq(parseEther("99800"));
             
             const v2INCHBalance = await kod["balances(address,uint256)"](player1.address, 1);
+            expect(v2INCHBalance).gt(0);
+        });
+
+        it("should swap v-asset <-> v-asset", async () => {
+            await network.provider.send("evm_increaseTime", [60 * 5]);
+            await network.provider.send("evm_mine", []);
+            const INCHBalance = await kod["balances(address,uint256)"](player1.address, 1);
+            await kod.connect(player1).swap(1, 2, INCHBalance);
+            const INCHBalanceAfter = await kod["balances(address,uint256)"](player1.address, 1);
+            expect(INCHBalanceAfter).eq(0);
+
+            const vUSDBalance = await kod["balances(address,uint256)"](player1.address, 0);
+            expect(vUSDBalance).eq(parseEther("99800"));
+            
+            const aaveBalance = await kod["balances(address,uint256)"](player1.address, 2);
+            expect(aaveBalance).gt(0);
+        });
+
+        it("should swap v-asset <-> v-usd", async () => {
+            await network.provider.send("evm_increaseTime", [60 * 5]);
+            await network.provider.send("evm_mine", []);
+            const aaveBalance = await kod["balances(address,uint256)"](player1.address, 2);
+            await kod.connect(player1).swap(2, 0, aaveBalance);
+            const aaveBalanceAfter = await kod["balances(address,uint256)"](player1.address, 2);
+            expect(aaveBalanceAfter).eq(0);
+
+            const vUSDBalance = await kod["balances(address,uint256)"](player1.address, 0);
+            expect(vUSDBalance).gt(parseEther("99999"));
         });
 
         it("should steal the crown", async () => {

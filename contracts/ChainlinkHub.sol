@@ -32,7 +32,7 @@ interface IOracle {
 contract ChainlinkHub {
 
     mapping(uint256 => address) public oracles; // chainlink oracles addresses
-    uint256 public oracleLastIndex = 1; // it starts from 1 because the 0 index is v-usd
+    uint256 public oracleNextIndex = 1; // it starts from 1 because the 0 index is v-usd
     address public governance;
 
     event OracleAdded(address oracle);
@@ -62,8 +62,8 @@ contract ChainlinkHub {
 	/// @param _oracle oracle address
     function _addOracle(address _oracle) internal {
         require(_oracle != address(0));
-        oracles[oracleLastIndex] = _oracle;
-        oracleLastIndex++;
+        oracles[oracleNextIndex] = _oracle;
+        oracleNextIndex++;
         emit OracleAdded(_oracle);
     }
 

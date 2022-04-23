@@ -8,6 +8,7 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { parseEther } from "@ethersproject/units";
 
 import SDTABI from "./fixtures/SDTABI.json";
+import { parse } from "path";
 
 // asset index
 // 1 - 1inch/usd 0x443C5116CdF663Eb387e72C688D276e702135C87
@@ -21,7 +22,7 @@ import SDTABI from "./fixtures/SDTABI.json";
 // 9 - btc/usd 0xc907E116054Ad103354f2D350FD2514433D57F6f
 // 10 - comp/usd 0x2A8758b7257102461BC958279054e372C2b1bDE6
 // 11 - crv/usd 0x336584C8E6Dc19637A5b36206B1c79923111b405
-// 12 - cvx/usd 0x5ec151834040B4D453A1eA46aA634C1773b36084
+// 12 - luna/usd 0x1248573D9B62AC86a3ca02aBC6Abe6d403Cd1034
 // 13 - doge/usd 0xbaf9327b6564454F4a3364C33eFeEf032b4b4444
 // 14 - dot/usd 0xacb51F1a83922632ca02B25a8164c10748001BdE
 // 15 - eth/usd 0xF9680D99D6C9589e2a93a78A04A279e509205945
@@ -52,9 +53,10 @@ describe("KingOfDefiV0", function () {
         const gameDuration =  60 * 60 * 24 * 7; // 7 days
         const disputeDuration = 60 * 60 * 24; // 1 day
         const swapDelay = 60 * 5; // 5 minutes
+        const initialVUSD = parseEther("100000");
         sdt = await ethers.getContractAt(SDTABI, SDT);
         clh = await CLH.deploy();
-        kod = await KOD.deploy(gameDuration, disputeDuration, swapDelay, clh.address);
+        kod = await KOD.deploy(gameDuration, disputeDuration, swapDelay, initialVUSD, clh.address);
 
         await network.provider.request({
             method: "hardhat_impersonateAccount",

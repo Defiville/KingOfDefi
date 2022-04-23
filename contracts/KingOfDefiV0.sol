@@ -34,6 +34,7 @@ contract KingOfDefiV0 {
     uint256 gameEnd;
     uint256 disputeDuration;
     uint256 swapDelay;
+    uint256 initialVUSD;
 
     uint256 numberOfPlayers;
 
@@ -50,11 +51,13 @@ contract KingOfDefiV0 {
         uint256 _gameDuration, 
         uint256 _disputeDuration, 
         uint256 _swapDelay, 
+        uint256 _initialVUSD,
         address _chainlinkHub
     ) {
         gameEnd = block.timestamp + _gameDuration;
         disputeDuration = _disputeDuration;
         swapDelay = _swapDelay;
+        initialVUSD = _initialVUSD;
         chainlinkHub = _chainlinkHub;
     }
     
@@ -64,7 +67,7 @@ contract KingOfDefiV0 {
         require(block.timestamp < gameEnd, "subscriptions closed");
         require(!subscribed[msg.sender], "already subscribed");
         subscribed[msg.sender] = true;
-        balances[msg.sender][0] = 100_000 * 10**18; // 0 is VUSD
+        balances[msg.sender][0] = initialVUSD; // 0 is VUSD
         numberOfPlayers++;
         emit Subscribed(msg.sender);
     }

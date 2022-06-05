@@ -34,7 +34,7 @@ contract KingOfDefiV0Perp {
     mapping(uint256 => mapping(address => uint256)) public prizes; // week match => token
     mapping(address => uint256) public lastSwap;
     mapping(uint256 => address) public kings;
-    uint256[] public numberOfPlayers; // players for each week match 
+    mapping(uint256 => uint256) public numberOfPlayers; // players for each week match 
     uint256 public gameWeek = block.timestamp / 1 weeks;
 
     // Game Parameter
@@ -91,7 +91,7 @@ contract KingOfDefiV0Perp {
         require(!subscribed[gameWeek][msg.sender], "already subscribed");
         subscribed[gameWeek][msg.sender] = true;
         balances[gameWeek][msg.sender][0] = initialVUSD; // 0 is VUSD
-        numberOfPlayers[gameWeek] += 1;
+        unchecked{++numberOfPlayers[gameWeek];}
         emit Subscribed(msg.sender, gameWeek);
     }
 

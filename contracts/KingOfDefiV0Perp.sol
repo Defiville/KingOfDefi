@@ -14,9 +14,8 @@ Rules:
 5) The crown can be steal ONLY IF the actual USD value of the total virtual assets bought is higher than the actual crown holder usd value.
 6) At the end of the dispute period, the king can redeem the prize.
 
-Updates:
-V0.1
-Limited players
+Perp Version
+At every new week (midnight on thursday) a new match will start 
 */
 
 interface ICLH {
@@ -26,28 +25,25 @@ interface ICLH {
     function assetDescription(uint256) external view returns(string memory);
 }
 
-// Weekly game
+// Perpetual weekly game
 contract KingOfDefiV0Perp {
     using SafeERC20 for IERC20;
 
-    mapping(uint256 => mapping(address => mapping(uint256 => uint256))) public balances; // week => user => asset index => amount
+    mapping(uint256 => mapping(address => mapping(uint256 => uint256))) public balances; // week match => user => asset index => amount
     mapping(uint256 => mapping(address => bool)) public subscribed; // week match => user => subscribed
     mapping(uint256 => mapping(address => uint256)) public prizes; // week match => token
     mapping(address => uint256) public lastSwap;
-
-    uint256 public constant DURATION = WEEK;
-    uint256 public disputeDuration;
-    uint256 public swapDelay;
-    uint256 public initialVUSD;
-
-    uint256[] public numberOfPlayers;
-
     mapping(uint256 => address) public kings;
-    address public chainlinkHub;
+    uint256[] public numberOfPlayers; // players for each week match 
+    uint256 public gameWeek = block.timestamp / 1 weeks;
 
-    uint256 public constant WEEK = 604800;
-    uint256 gameWeek;
+    // Game Parameter
+    uint256 public constant disputeDuration = 1 days;
+    uint256 public constant swapDelay = 2 minutes;
+    uint256 public constant initialVUSD = 100_000;
+    address public chainlinkHub; // game assets oracle hub
 
+    // Game Events 
     event Subscribed(address indexed player, uint256 indexed gameWeek);
     event Swapped(
         uint256 indexed gameWeek,
@@ -76,21 +72,13 @@ contract KingOfDefiV0Perp {
     );
 
     constructor( 
-        uint256 _disputeDuration, 
-        uint256 _swapDelay, 
-        uint256 _initialVUSD,
         address _chainlinkHub
     ) {
-        require(disputeDuration <= 1 days);
-        disputeDuration = _disputeDuration;
-        swapDelay = _swapDelay;
-        initialVUSD = _initialVUSD;
         chainlinkHub = _chainlinkHub;
-        gameWeek = block.timestamp / WEEK;
     }
 
     modifier updateWeek() {
-        uint256 currentGameWeek = block.timestamp / WEEK;
+        uint256 currentGameWeek = block.timestamp / 1 weeks;
         if (currentGameWeek > gameWeek) {
             gameWeek = currentGameWeek;
         }
@@ -103,7 +91,7 @@ contract KingOfDefiV0Perp {
         require(!subscribed[gameWeek][msg.sender], "already subscribed");
         subscribed[gameWeek][msg.sender] = true;
         balances[gameWeek][msg.sender][0] = initialVUSD; // 0 is VUSD
-        ++numberOfPlayers[gameWeek];
+        numberOfPlayers[gameWeek] += 1;
         emit Subscribed(msg.sender, gameWeek);
     }
 
@@ -113,7 +101,8 @@ contract KingOfDefiV0Perp {
     /// @param _toIndex index of the token to swap to
     /// @param _amount amount to swap
     function swap(uint256 _fromIndex, uint256 _toIndex, uint256 _amount) external updateWeek() {
-        require(block.timestamp < gameWeek + WEEK - disputeDuration, "crown dispute period");
+        require(subscribed[gameWeek][msg.sender], "player not subscribed");
+        require(block.timestamp < gameWeek + 1 weeks - disputeDuration, "crown dispute period");
         require(block.timestamp > lastSwap[msg.sender] + swapDelay, "player swap delay not elapsed");
         require(_fromIndex != _toIndex, "same index");
         require(_amount > 0, "set an amount > 0");
@@ -168,13 +157,13 @@ contract KingOfDefiV0Perp {
     /// @notice steal the crown from the king, you can if you have more usd value
     /// @dev it can be called only during the crown dispute time
     function stealCrown() external updateWeek() {
-        require(block.timestamp > gameWeek + WEEK - disputeDuration, "only during dispute time");
+        require(block.timestamp > gameWeek + 1 weeks - disputeDuration, "only during dispute time");
         if (kings[gameWeek] == address(0)) {
             kings[gameWeek] = msg.sender;
             return;
         }
-        uint256 actualKingUSD = calculateTotalUSD(kings[gameWeek], gameWeek);
-        uint256 rivalUSD = calculateTotalUSD(msg.sender, gameWeek);
+        uint256 actualKingUSD = calculateTotalUSD(kings[gameWeek]);
+        uint256 rivalUSD = calculateTotalUSD(msg.sender);
         if (rivalUSD > actualKingUSD) {
             emit NewKing(gameWeek, kings[gameWeek], msg.sender, actualKingUSD, rivalUSD);
             kings[gameWeek] = msg.sender;
@@ -196,19 +185,18 @@ contract KingOfDefiV0Perp {
 	/// @param _player player address
     /// @param _assetIndex index of the asset 
     function balanceOfInUSD(address _player, uint256 _assetIndex) external view returns(uint256) {
-        uint256 currentGameWeek = block.timestamp / WEEK;
-        uint256 amount = balances[currentGameWeek][_player][_assetIndex];
+        uint256 amount = balances[gameWeek][_player][_assetIndex];
         return ICLH(chainlinkHub).getUSDForAmount(_assetIndex, amount);
     }
 
-    /// @notice calculate total usd value of the player
+    /// @notice calculate total usd value of the player for the current week
 	/// @param _player player address
-    function calculateTotalUSD(address _player, uint256 _gameWeek) public view returns(uint256) {
+    function calculateTotalUSD(address _player) public view returns(uint256) {
         uint256 usdTotalAmount;
         uint256 nextIndex = ICLH(chainlinkHub).oracleNextIndex();
-        usdTotalAmount += balances[_gameWeek][_player][0]; // v-usd
+        usdTotalAmount += balances[gameWeek][_player][0]; // v-usd
         for(uint256 index = 1; index < nextIndex;) {
-            uint256 amount = balances[_gameWeek][_player][index];
+            uint256 amount = balances[gameWeek][_player][index];
             if (amount > 0) {
                 usdTotalAmount += ICLH(chainlinkHub).getUSDForAmount(index, amount);
             }

@@ -102,7 +102,7 @@ contract KingOfDefiV0Perp {
     /// @param _amount amount to swap
     function swap(uint256 _fromIndex, uint256 _toIndex, uint256 _amount) external updateWeek() {
         require(subscribed[gameWeek][msg.sender], "player not subscribed");
-        require(block.timestamp < gameWeek + 1 weeks - disputeDuration, "crown dispute period");
+        require(block.timestamp < (gameWeek * 1 weeks) + 1 weeks - disputeDuration, "crown dispute period");
         require(block.timestamp > lastSwap[msg.sender] + swapDelay, "player swap delay not elapsed");
         require(_fromIndex != _toIndex, "same index");
         require(_amount > 0, "set an amount > 0");
@@ -157,7 +157,7 @@ contract KingOfDefiV0Perp {
     /// @notice steal the crown from the king, you can if you have more usd value
     /// @dev it can be called only during the crown dispute time
     function stealCrown() external updateWeek() {
-        require(block.timestamp > gameWeek + 1 weeks - disputeDuration, "only during dispute time");
+        require(block.timestamp > (gameWeek * 1 weeks) + 1 weeks - disputeDuration, "only during dispute time");
         if (kings[gameWeek] == address(0)) {
             kings[gameWeek] = msg.sender;
             return;
